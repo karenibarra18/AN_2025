@@ -1,0 +1,443 @@
+---
+title: "Tarea 4"
+author: "Valtierra Ibarra Karen Lizbeth"
+format: html
+editor: visual
+---
+
+```{python}
+
+#| code-fold: true
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
+import statsmodels.api as sm
+import calendar
+from pandas.plotting import register_matplotlib_converters
+from statsmodels.graphics.tsaplots import plot_acf
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.ar_model import AutoReg
+
+```
+
+# Gráficas de una Serie temporal
+
+Las **series temporales** son representaciones visuales de observaciones registradas a intervalos regulares de tiempo. Permiten identificar patrones, tendencias y variaciones en los datos, siendo esenciales para el análisis y la predicción en múltiples áreas.
+
+## Serie
+
+```{python}
+# Crear serie temporal de Tipo de Cambio Real Multilateral
+tipo_cambio_real_xts = pd.Series(filtered_data["Tipo_Cambio_Real_Multilateral"].values, 
+                                 index=filtered_data['Periodo']).dropna()
+
+# Estadísticas descriptivas
+print(tipo_cambio_real_xts.describe())
+
+# Gráfica de la serie temporal
+plt.figure(figsize=(12, 9))
+plt.plot(tipo_cambio_real_xts, 
+         label="Tipo de Cambio Real Multilateral", 
+         color=sns.color_palette("magma", n_colors=5)[3])
+plt.title("Serie Temporal del Tipo de Cambio Real Multilateral")
+plt.xlabel("Periodo")
+plt.ylabel("Tipo de Cambio Real Multilateral")
+plt.legend()
+plt.grid(True, linestyle="--", alpha=0.7)
+plt.show()
+
+# Gráfica simple
+
+```{python}
+plt.figure(figsize=(12,9))
+plt.plot(MXN_series)
+plt.title("Cetes 28 Días (2016 en adelante)")
+plt.xlabel("Fecha")
+plt.ylabel("Cetes 28 Días")
+plt.grid()
+plt.tight_layout()
+plt.show()
+
+```
+
+## Comparación anual
+```{python}
+# Convertir la serie a DataFrame y agregar columnas de año y mes
+inegi_xts_df = tipo_cambio_real_xts.to_frame(name="Tipo_Cambio_Real_Multilateral")
+inegi_xts_df["Año"] = tipo_cambio_real_xts.index.year
+inegi_xts_df["Mes"] = tipo_cambio_real_xts.index.month
+
+# Gráfica de comparación anual
+plt.figure(figsize=(12, 9))
+sns.lineplot(
+    data=inegi_xts_df, 
+    x="Mes", 
+    y="Tipo_Cambio_Real_Multilateral", 
+    hue="Año", 
+    palette=sns.color_palette("darkblue", n_colors=10)
+)
+plt.title("Comparación Anual del Tipo de Cambio Real Multilateral")
+plt.xlabel("Mes")
+plt.ylabel("Tipo de Cambio Real Multilateral")
+plt.legend(title="Año")
+plt.grid(True, linestyle="--", alpha=0.8)
+plt.show()
+```
+## Comparación mensual
+```{python}
+plt.figure(figsize=(12, 9))
+sns.lineplot(
+    data=df_real, 
+    x='Mes', 
+    y='Tipo_Cambio_Real_Multilateral', 
+    hue='Año', 
+    palette='darkblue', 
+    marker='o'
+)
+plt.xticks(ticks=range(2, 12), labels=calendar.month_abbr[2:12])
+plt.xlabel('Mes')
+plt.ylabel('Tipo de Cambio Real Multilateral')
+plt.title('Comparación anual del Tipo de Cambio Real Multilateral')
+plt.legend(title='Año')
+plt.show()
+```
+
+```{python}
+# Crear fechas mensuales fin de mes (ME) desde 2016 hasta 2025
+fechas = pd.date_range(start="2016-01-31", end="2025-01-31", freq="M")
+datos = [float(i) for i in range(len(fechas))]
+
+# Crear serie temporal simulada
+inegi_xts = pd.Series(data=datos, index=fechas)
+
+# Asegurar frecuencia mensual fin de mes
+inegi_xts = inegi_xts.asfreq("M")
+
+# Descomposición estacional aditiva (periodo 12 para datos mensuales)
+descomposicion = seasonal_decompose(inegi_xts, model="additive", period=12)
+
+# Gráfica de la componente estacional
+plt.figure(figsize=(12, 9))
+plt.plot(descomposicion.seasonal, label="Tipo de Cambio Real Multilateral", color=sns.color_palette("magma", n_colors=5)[4])
+plt.xlabel("Periodo")
+plt.ylabel("Estacionalidad")
+plt.title("Estacionalidad del Tipo de Cambio Real Multilateral")
+plt.legend()
+plt.grid(True, linestyle="--", alpha=0.7)
+plt.show()
+```
+
+## Heatmap
+```{python}
+# Asegurar que la columna 'Periodo' sea datetime
+inegi_data["Periodo"] = pd.to_datetime(inegi_data["Periodo"])
+
+# Extraer año y trimestre (si lo necesitas)
+inegi_data["Año"] = inegi_data["Periodo"].dt.year
+inegi_data["Trimestre"] = inegi_data["Periodo"].dt.to_period("Q")
+
+# Preparar pivot table para heatmap con meses y años
+heatmap = df_real.pivot(index="Mes", columns="Año", values="Tipo_Cambio_Real_Multilateral")
+
+plt.figure(figsize=(12, 9))
+sns.heatmap(
+    heatmap, 
+    cmap="Spectral", 
+    annot=True, 
+    fmt=".2f", 
+    linewidths=0.5
+)
+
+plt.title("Mapa de Calor del Tipo de Cambio Real Multilateral")
+plt.xlabel("Año")
+plt.ylabel("Mes")
+plt.yticks(
+    ticks=range(1, 13), 
+    labels=["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
+    rotation=0
+)
+plt.tight_layout()
+plt.show()
+```
+
+## Surface
+```{python}
+df_real["Año"] = df_real["Periodo"].dt.year
+df_real["Mes"] = df_real["Periodo"].dt.month
+
+heatmap_df = df_real.pivot_table(
+    values="Tipo_Cambio_Real_Multilateral", 
+    index="Mes", 
+    columns="Año", 
+    aggfunc="mean"
+).fillna(0)
+
+Z = heatmap_df.values  
+x = heatmap_df.columns.astype(str)  
+y = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+fig = go.Figure(data=[go.Surface(z=Z, x=x, y=y, colorscale="pink")])
+fig.update_layout(
+    title='Superficie 3D del Tipo de Cambio Real Multilateral',
+    scene=dict(
+        xaxis_title="Año",
+        yaxis_title="Mes",
+        zaxis_title="Tipo de Cambio Real Multilateral"
+    ),
+    autosize=True,
+    height=600
+)
+fig.show()
+```
+
+# Estadisticas de una serie temporal
+
+## Media Muestral
+
+La media muestral corresponde al valor promedio obtenido al considerar todos los datos de la serie temporal en el periodo analizado. Se determina mediante:
+
+\begin{equation}
+\bar{y}=\frac{1}{T} \sum_{t=1}^T y_t
+\end{equation}
+
+Aquí $T$ representa la cantidad total de observaciones en la serie y  $y_t$ indica el valor correspondiente al tiempo $t$.
+
+```{python}
+media = inegi_xts.mean()
+print(f"La media muestral de la serie temporal es: {media:.2f}")
+```
+
+## Varianza Muestral
+
+La varianza muestral mide qué tanto se alejan los valores de una serie temporal respecto a su media. Su cálculo es:
+
+\begin{equation}
+s^2=\frac{1}{T-1} \sum_{t=1}^T (y_t-\bar{y})^2
+\end{equation}
+
+```{python}
+varianza = inegi_xts.var()
+print(f"La varianza muestral de la serie es: {varianza:.2f}")
+```
+
+## Autocovarianza muestral
+
+Cuantifica la covarianza entre dos valores de la serie separados por un retraso (lag) $k$. Se calcula como:
+
+\begin{equation}
+\gamma_k=\frac{1}{T} \sum_{t=k+1}^T (y_t-\bar{y})(y_{t-k}-\bar{y})
+\end{equation}
+
+En este caso $y_{t-k}$ es el valor de la serie en el tiempo $t-k$.
+
+## Autocorrelación muestral {.tabset}
+
+Es una versión normalizada de la autocovarianza, que mide la correlacion entre dos valores de la serie separados por un retraso $k$, se calcula como:
+
+\begin{equation}
+\rho_k=\frac{\gamma_k}{\gamma_0}
+\end{equation}
+
+## Autocorrelación
+
+```{python}
+# Calcular autocorrelación
+autocorrelacion = acf(inegi_xts, fft=True, nlags=30)
+
+# Graficar autocorrelación
+plt.figure(figsize=(12, 6))
+plt.stem(range(len(autocorrelacion)), autocorrelacion, basefmt=" ")
+plt.title("Función de Autocorrelación (ACF)")
+plt.xlabel("Rezago (Lag)")
+plt.ylabel("Autocorrelación")
+plt.grid(True, linestyle="--", alpha=0.8)
+plt.show()
+```
+
+### Lags
+```{python}
+lags = 30
+plt.figure(figsize=(12, 6))
+
+# Graficar la serie original del Tipo de Cambio Real Multilateral
+plt.plot(df_real['Periodo'], df_real['Tipo_Cambio_Real_Multilateral'], label='Original', linewidth=2, color='red')
+
+# Graficar las series desplazadas por cada lag
+for i in range(1, lags + 1):
+    plt.plot(df_real['Periodo'], df_real['Tipo_Cambio_Real_Multilateral'].shift(i), label=f'Lag {i}', alpha=0.7)
+
+plt.title('Serie Temporal y sus Lags - Tipo de Cambio Real Multilateral')
+plt.xlabel('Fecha')
+plt.ylabel('Tipo de Cambio Real Multilateral')
+plt.legend(title='Lags')
+plt.grid(True)
+plt.show()
+```
+
+## Estacionariedad
+
+Una serie temporal se considera **estacionaria** cuando su media y varianza permanecen constantes a lo largo del tiempo, y la autocovarianza entre dos puntos depende únicamente del intervalo de tiempo que los separa, sin importar en qué momento se midan.
+
+```{python}
+
+estacionariedad = adfuller(inegi_xts)
+print(f"{estacionariedad}")
+```
+
+**La serie no es estacionaria**
+
+## Diferenciación
+
+Cuando una serie no es estacionaria, se puede recurrir a la diferenciación para eliminar la tendencia y estabilizar sus propiedades estadísticas.
+
+```{python}
+# Crear serie temporal del Tipo de Cambio Real Multilateral
+real_xts = pd.Series(df_real["Tipo_Cambio_Real_Multilateral"].values, index=df_real["Periodo"]).dropna()
+
+# Diferenciar la serie para eliminar tendencia si es necesario
+real_diff = real_xts.diff().dropna()
+
+# Graficar la serie diferenciada
+plt.figure(figsize=(10, 6))
+plt.plot(real_diff, label="Diferenciación de Tipo de Cambio Real", color="darkblue")
+plt.title("Serie Temporal Diferenciada - Tipo de Cambio Real Multilateral")
+plt.xlabel("Periodo")
+plt.ylabel("Diferenciación")
+plt.legend()
+plt.grid(True, linestyle="--", alpha=0.8)
+plt.show()
+```
+
+# Descomposición {.tabset}
+
+Una serie temporal $y_t$ puede separarse en la suma (modelo aditivo) de sus componentes fundamentales:
+
+\begin{equation}
+y_t = T_t+S_t+R_t
+\end{equation}
+
+Donde $T_t$ representa la tendencia o el comportamiento a largo plazo, $S_t$ corresponde a la estacionalidad, que son patrones recurrentes en intervalos periódicos, y $R_t$ es el componente residual o ruido aleatorio. Alternativamente, la serie puede modelarse mediante una descomposición multiplicativa:
+
+\begin{equation}
+y_t = T_t S_t R_t
+\end{equation}
+
+## Serie Original
+
+**Descomposición aditiva**
+
+```{python}
+result = seasonal_decompose(inegi_xts, model='additive', period=12)
+
+fig, axes = plt.subplots(4, 1, figsize=(12, 9), sharex=True)
+result.observed.plot(ax=axes[0], legend=False, title='Serie Observada')
+result.trend.plot(ax=axes[1], legend=False, title='Tendencia')
+result.seasonal.plot(ax=axes[2], legend=False, title='Estacionalidad')
+result.resid.plot(ax=axes[3], legend=False, title='Residuo')
+
+plt.tight_layout()
+plt.show()
+```
+
+## Serie Diferenciada
+
+**Descomposición aditiva**
+
+```{python}
+# Diferenciar la serie para eliminar tendencia
+inegi_diff = inegi_xts.diff().dropna()
+
+# Descomposición aditiva de la serie diferenciada
+resultado_diff = seasonal_decompose(inegi_diff, model='additive', period=12)
+
+# Graficar los componentes
+fig, axs = plt.subplots(4, 1, figsize=(12, 9), sharex=True)
+resultado_diff.observed.plot(ax=axs[0], title='Serie Observada Diferenciada')
+resultado_diff.trend.plot(ax=axs[1], title='Tendencia')
+resultado_diff.seasonal.plot(ax=axs[2], title='Estacionalidad')
+resultado_diff.resid.plot(ax=axs[3], title='Residuo')
+
+plt.tight_layout()
+plt.show()
+```
+
+# AutoRegresión {.tabset}
+
+## Coeficientes
+
+```{python}
+# Convertir la serie a frecuencia mensual al inicio del mes
+inegi_ts = inegi_xts.asfreq('MS')
+
+# Ajustar modelo autorregresivo con 5 rezagos
+modelo_ar = AutoReg(inegi_ts, lags=5, old_names=False).fit()
+
+# Mostrar resumen del modelo
+print(modelo_ar.summary())
+```
+
+## Gráfica
+
+```{python}
+# Asegurar que el índice sea de tipo datetime
+inegi_ts.index = pd.to_datetime(inegi_ts.index, errors='coerce')
+
+# Crear DataFrame con valores originales y ajustados
+inegi_ar_res = pd.DataFrame({
+    'Original': inegi_ts,
+    'Ajustado': inegi_ts - inegi_ar_model.resid
+})
+
+# Graficar ambas series
+plt.figure(figsize=(12, 9))
+plt.plot(inegi_ar_res.index, inegi_ar_res['Original'], label='Serie Original', color='purple', alpha=0.8)
+plt.plot(inegi_ar_res.index, inegi_ar_res['Ajustado'], label='Serie Ajustada', color='green', linestyle='--')
+
+plt.title('Comparación entre Datos Originales y Ajustados del Modelo AR')
+plt.xlabel('Fecha')
+plt.ylabel('Valor')
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.show()
+```
+
+## Residuos
+```{python}
+plt.figure(figsize=(12,9))
+plt.plot(inegi_ar_model.resid, label='Errores del Modelo', color='firebrick')
+plt.axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.6)
+plt.title('Gráfica de Residuos del Modelo AR')
+plt.xlabel('Fecha')
+plt.ylabel('Residuales')
+plt.legend()
+plt.grid(visible=True, linestyle='--', alpha=0.7)
+plt.show()
+```
+
+## Forecast
+```{python}
+forecast_steps = 12
+forecast_vals = inegi_ar_model.forecast(steps=forecast_steps)
+forecast_dates = pd.date_range(start=inegi_ts.index[-1] + pd.offsets.MonthBegin(1), periods=forecast_steps, freq='MS')
+
+inegi_forecast = pd.DataFrame({
+    'Pronóstico': forecast_vals
+}, index=forecast_dates)
+
+plt.figure(figsize=(12,9))
+plt.plot(inegi_ts, label='Datos Originales', color='blue')
+plt.plot(inegi_ar_res['inegi_fitted'], label='Valores Ajustados', color='orange')
+plt.plot(inegi_forecast.index, inegi_forecast['Pronóstico'], label='Pronóstico', color='green', linestyle='--')
+
+plt.title('Pronóstico con Modelo Autoregresivo')
+plt.xlabel('Fecha')
+plt.ylabel('Valor')
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.8)
+plt.show()
+```
+
